@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Игра на реакцию</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #1a1d27;
+    --accent: #6c8cff;
+    --good: #3ddc84;
+    --bad: #ff5c72;
+    --warn: #ffc857;
+    --text: #e8eaf2;
+    --muted: #8b90a5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1b2033 0%, var(--bg) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    user-select: none;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: .5px; }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 6px; margin-bottom: 20px; }
+
+  .board {
+    width: min(560px, 100%);
+    background: var(--panel);
+    border: 1px solid #262b3a;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  }
+
+  .arena {
+    height: 280px;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    transition: background .15s ease, transform .05s ease;
+    background: #12141c;
+    border: 2px dashed #2c3247;
+    padding: 16px;
+  }
+  .arena:active { transform: scale(.995); }
+  .arena.ready { background: #10251c; border-color: var(--good); border-style: solid; }
+  .arena.wait  { background: #2a1418; border-color: var(--bad); border-style: solid; }
+  .arena.result{ background: #151a2b; border-color: var(--accent); border-style: solid; }
+
+  .big { font-size: 46px; font-weight: 800; line-height: 1.1; }
+  .hint { font-size: 15px; color: var(--muted); margin-top: 10px; }
+  .state-ready { color: var(--good); }
+  .state-wait  { color: var(--bad); }
+  .state-info  { color: var(--accent); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .stat {
+    background: #12141c;
+    border: 1px solid #262b3a;
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat .v { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-top: 4px; }
+
+  .bar {
+    height: 8px;
+    background: #12141c;
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 16px;
+    border: 1px solid #262b3a;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--bad), var(--warn), var(--good));
+    transition: width .3s ease;
+  }
+
+  .controls { display: flex; gap: 10px; margin-top: 18px; }
+  button {
+    flex: 1;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #2c3247;
+    background: #171a25;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { background: #1e2231; border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #0d1020; }
+  button.primary:hover { filter: brightness(1.1); }
+
+  .log {
+    margin-top: 16px;
+    max-height: 130px;
+    overflow-y: auto;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .log div { display: flex; justify-content: space-between; padding: 6px 10px; background: #12141c; border-radius: 8px; }
+  .log b { color: var(--text); font-weight: 600; }
+
+  /* ---- Таблица лидеров ---- */
+  .board.leaders { margin-top: 16px; }
+  .leaders h2 { font-size: 18px; margin-bottom: 14px; }
+  .name-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .name-row label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .name-row input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2c3247;
+    background: #12141c;
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .name-row input:focus { border-color: var(--accent); }
+  .name-row input::placeholder { color: #565b70; }
+
+  .leaders table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .leaders th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--muted);
+    padding: 6px 8px;
+    border-bottom: 1px solid #262b3a;
+  }
+  .leaders td { padding: 9px 8px; border-bottom: 1px solid #1e2231; }
+  .leaders tbody tr:last-child td { border-bottom: none; }
+  .leaders th.r, .leaders td.ms, .leaders td.when { text-align: right; }
+  .leaders td.rank { width: 44px; font-weight: 700; color: var(--muted); }
+  .leaders td.who { color: var(--text); font-weight: 600; word-break: break-word; }
+  .leaders td.ms { color: var(--good); font-weight: 700; white-space: nowrap; }
+  .leaders td.when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .leaders tr.me td { background: rgba(108, 140, 255, .12); }
+  .leaders tr.me td.who::after { content: " — ты"; color: var(--accent); font-weight: 500; font-size: 12px; }
+  .leaders .empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 14px; }
+
+  .leaders-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .leaders-actions button { font-size: 13px; padding: 9px 12px; color: var(--muted); }
+  .leaders-actions button:hover { color: var(--bad); border-color: var(--bad); }
+  .rating-note { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #2c3247; border-radius: 99px; }
+
+  @media (max-width: 480px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .big { font-size: 34px; }
+    .leaders td.when, .leaders th.when { display: none; }
+    .name-row { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+
+<h1>⚡ Игра на реакцию</h1>
+<div class="sub">Кликни (или нажми ПРОБЕЛ), как только загорится зелёный. Не жми раньше!</div>
+
+<div class="board">
+  <div class="arena" id="arena">
+    <div class="big state-info" id="big">Нажми «Старт»</div>
+    <div class="hint" id="hint">или просто нажми пробел</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="best">—</div><div class="l">Рекорд, мс</div></div>
+    <div class="stat"><div class="v" id="avg">—</div><div class="l">Среднее, мс</div></div>
+    <div class="stat"><div class="v" id="tries">0</div><div class="l">Попыток</div></div>
+    <div class="stat"><div class="v" id="fails">0</div><div class="l">Фальстартов</div></div>
+  </div>
+
+  <div class="bar"><i id="bar"></i></div>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">Старт</button>
+    <button id="resetBtn">Сброс</button>
+  </div>
+
+  <div class="log" id="log"></div>
+</div>
+
+<div class="board leaders">
+  <h2>🏆 Таблица лидеров</h2>
+
+  <div class="name-row">
+    <label for="playerName">Твоё имя:</label>
+    <input id="playerName" type="text" maxlength="16" placeholder="Аноним" autocomplete="off" spellcheck="false">
+  </div>
+
+  <div id="leadersWrap"></div>
+
+  <div class="leaders-actions">
+    <button id="clearLeadersBtn">Очистить таблицу</button>
+  </div>
+  <div class="rating-note">Сохраняется в этом браузере · топ-10 результатов</div>
+</div>
+
+<script>
+(function () {
+  const arena = document.getElementById('arena');
+  const big = document.getElementById('big');
+  const hint = document.getElementById('hint');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const log = document.getElementById('log');
+  const bar = document.getElementById('bar');
+
+  const el = {
+    best: document.getElementById('best'),
+    avg: document.getElementById('avg'),
+    tries: document.getElementById('tries'),
+    fails: document.getElementById('fails')
+  };
+
+  /* ---------- Таблица лидеров ---------- */
+  const leadersWrap = document.getElementById('leadersWrap');
+  const nameInput = document.getElementById('playerName');
+  const clearLeadersBtn = document.getElementById('clearLeadersBtn');
+
+  const LS_LEADERS = 'reaction-leaders-v1';
+  const LS_NAME = 'reaction-name-v1';
+  const TOP_N = 10;
+
+  let leaders = load(LS_LEADERS, []);
+  if (!Array.isArray(leaders)) leaders = [];
+  let lastEntryId = null;
+
+  function load(key, fallback) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return v == null ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+  function save(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  function renderLeaders() {
+    if (!leaders.length) {
+      leadersWrap.innerHTML = '<div class="empty">Пока пусто — сыграй пару раз и попади в список!</div>';
+      return;
+    }
+    const rows = leaders.map((e, i) => {
+      const medal = ['🥇', '🥈', '🥉'][i] || String(i + 1);
+      const cls = e.id === lastEntryId ? ' class="me"' : '';
+      const d = new Date(e.ts);
+      const when = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
+                   d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      return '<tr' + cls + '><td class="rank">' + medal + '</td>' +
+             '<td class="who">' + esc(e.name) + '</td>' +
+             '<td class="ms">' + e.ms + ' мс</td>' +
+             '<td class="when">' + when + '</td></tr>';
+    }).join('');
+
+    leadersWrap.innerHTML =
+      '<table><thead><tr>' +
+      '<th>#</th><th>Игрок</th><th class="r">Результат</th><th class="r when">Дата</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  // Возвращает занятую строку в топе или -1
+  function addLeader(ms) {
+    const name = nameInput.value.trim().slice(0, 16) || 'Аноним';
+    const entry = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), name: name, ms: ms, ts: Date.now() };
+    leaders.push(entry);
+    leaders.sort((a, b) => a.ms - b.ms || a.ts - b.ts);
+    leaders = leaders.slice(0, TOP_N);
+    lastEntryId = leaders.some((e) => e.id === entry.id) ? entry.id : null;
+    save(LS_LEADERS, leaders);
+    renderLeaders();
+    return leaders.findIndex((e) => e.id === entry.id);
+  }
+
+  nameInput.value = load(LS_NAME, '');
+  nameInput.addEventListener('input', () => {
+    save(LS_NAME, nameInput.value);
+    lastEntryId = null;
+    renderLeaders();
+  });
+
+  clearLeadersBtn.addEventListener('click', () => {
+    if (!leaders.length) return;
+    if (!confirm('Удалить все результаты таблицы лидеров?')) return;
+    leaders = [];
+    lastEntryId = null;
+    save(LS_LEADERS, leaders);
+    renderLeaders();
+  });
+
+  /* -------------------------------------- */
+
+  const MIN_WAIT = 900;   // минимум ожидания, мс
+  const MAX_WAIT = 3500;  // максимум ожидания, мс
+
+  let state = 'idle';     // idle | waiting | ready | done
+  let timer = null;
+  let appearedAt = 0;
+  let history = [];
+  let fails = 0;
+
+  function setState(s) { state = s; }
+
+  function renderStats() {
+    const n = history.length;
+    if (n) {
+      const best = Math.min.apply(null, history);
+      const avg = Math.round(history.reduce((a, b) => a + b, 0) / n);
+      el.best.textContent = best;
+      el.avg.textContent = avg;
+      // 0 мс = лучший результат (100%), 600 мс = 0%
+      const pct = Math.max(0, Math.min(100, (1 - (best - 150) / 450) * 100));
+      bar.style.width = pct + '%';
+    }
+    el.tries.textContent = n;
+    el.fails.textContent = fails;
+  }
+
+  function addLog(ms) {
+    const div = document.createElement('div');
+    const idx = history.length;
+    const grade = ms <= 200 ? '🔥 молния' : ms <= 260 ? 'отлично' : ms <= 330 ? 'хорошо' : 'нормально';
+    div.innerHTML = '<span>Попытка ' + idx + '</span><b>' + ms + ' мс · ' + grade + '</b>';
+    log.prepend(div);
+    while (log.children.length > 12) log.removeChild(log.lastChild);
+  }
+
+  function show(text, cls, sub) {
+    big.textContent = text;
+    big.className = 'big ' + cls;
+    hint.textContent = sub || '';
+  }
+
+  function reset() {
+    clearTimeout(timer);
+    setState('idle');
+    arena.className = 'arena';
+    show('Нажми «Старт»', 'state-info', 'или просто нажми пробел');
+    startBtn.textContent = 'Старт';
+  }
+
+  function start() {
+    if (state === 'waiting' || state === 'ready') { reset(); return; }
+    clearTimeout(timer);
+    setState('waiting');
+    arena.className = 'arena wait';
+    show('Жди…', 'state-wait', 'не нажимай, пока не станет зелёным');
+    startBtn.textContent = 'Отмена';
+
+    const delay = MIN_WAIT + Math.random() * (MAX_WAIT - MIN_WAIT);
+    timer = setTimeout(() => {
+      setState('ready');
+      appearedAt = performance.now();
+      arena.className = 'arena ready';
+      show('ЖМИ!', 'state-ready', 'кликни прямо сейчас');
+    }, delay);
+  }
+
+  function click() {
+    if (state === 'idle') { start(); return; }
+    if (state === 'waiting') {
+      // фальстарт
+      clearTimeout(timer);
+      fails++;
+      renderStats();
+      setState('done');
+      arena.className = 'arena wait';
+      show('Рано! 😅', 'state-wait', 'фальстарт — жди зелёного. Нажми, чтобы повторить');
+      startBtn.textContent = 'Старт';
+      return;
+    }
+    if (state === 'ready') {
+      const ms = Math.round(performance.now() - appearedAt);
+      setState('done');
+      const prevBest = history.length ? Math.min.apply(null, history) : Infinity;
+      history.push(ms);
+      renderStats();
+      addLog(ms);
+
+      const isRecord = ms < prevBest;
+      const place = addLeader(ms);
+
+      arena.className = 'arena result';
+      let sub = '';
+      if (isRecord) sub += '🏆 новый рекорд! ';
+      sub += place >= 0 ? '№ ' + (place + 1) + ' в топе лидеров' : 'в топ-10 не попал';
+      sub += ' — жми, чтобы ещё раз';
+      show(ms + ' мс', 'state-info', sub);
+      startBtn.textContent = 'Ещё раз';
+      return;
+    }
+    if (state === 'done') { start(); }
+  }
+
+  arena.addEventListener('click', click);
+  startBtn.addEventListener('click', (e) => { e.stopPropagation(); start(); });
+  resetBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    history = [];
+    fails = 0;
+    log.innerHTML = '';
+    renderStats();
+    bar.style.width = '0%';
+    reset();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      click();
+    }
+    if (e.code === 'Escape') reset();
+  });
+
+  renderLeaders();
+  renderStats();
+})();
+</script>
+</body>
+</html>
